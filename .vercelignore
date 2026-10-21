@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+data
+test-data
+.secrets.local
+.env*.local
+tsconfig.tsbuildinfo
+DESIGN.md
+PRD.md

@@ -1,0 +1,16 @@
+Campaign name,Ad set name,Amount spent (USD),Impressions,Reach,Frequency,Clicks (all),CTR (all),CPC (all),Results,Cost per result,Ad set daily budget
+Spring Sale,Spring Sale — Broad,612.40,88200,31400,2.81,1058,1.20,0.58,,,50
+Spring Sale,Spring Sale — Retargeting 30d,234.60,40208,6180,6.51,241,0.60,0.97,,,20
+Prospecting,Prospecting — Lookalike 2%,486.20,65100,28900,2.25,1432,2.20,0.34,27,18.01,40
+Prospecting,Prospecting — Interest Broad,402.55,52000,24100,2.16,884,1.70,0.46,10,40.26,35
+Clearance,Clearance — Old Creative,187.30,96500,19800,4.87,212,0.22,0.88,,,15
+Traffic,Traffic — Blog Readers,96.85,120400,45200,2.66,3612,3.00,0.03,,,10
+Always On,Always On — Brand,154.20,19800,12400,1.60,574,2.90,0.27,12,12.85,15
+Promo,Promo — Small Test 1,18.40,3200,2600,1.23,41,1.28,0.45,,,3
+Promo,Promo — Small Test 2,12.75,2100,1800,1.17,23,1.10,0.55,,,2
+Promo,Promo — Small Test 3,22.10,4100,3300,1.24,55,1.34,0.40,,,4
+Promo,Promo — Small Test 4,9.60,1500,1300,1.15,14,0.93,0.69,,,5
+Promo,Promo — Small Test 5,27.30,5300,4200,1.26,79,1.49,0.35,,,6
+Retargeting,Retargeting — Cart Abandon,132.45,15400,6800,2.26,339,2.20,0.39,4,33.11,12
+Prospecting,Lookalike 1% — Purchasers,298.75,38900,21400,1.82,856,2.20,0.35,15,19.92,30
+Test,Zero Conversion Test,120.00,8400,5900,1.42,96,1.14,1.25,,,10
