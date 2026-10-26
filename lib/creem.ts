@@ -32,7 +32,7 @@ export async function createCheckout(params: {
 
   const resp = await fetch(`${API_BASE}/checkouts`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-api-key": apiKey },
+    headers: { "Content-Type": "application/json", "x-api-key": apiKey, "User-Agent": UA },
     body: JSON.stringify({
       product_id: productId,
       success_url: params.successUrl,

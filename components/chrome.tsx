@@ -25,6 +25,8 @@ export function Footer() {
     <footer className="footer">
       <div className="wrap">
         <p>
+          <Link href="/rules">How it works</Link>
+          <Link href="/compare">Compare tools</Link>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
           <a href={`mailto:${CONTACT_EMAIL}`}>Contact: {CONTACT_EMAIL}</a>

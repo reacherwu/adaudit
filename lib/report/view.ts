@@ -15,6 +15,7 @@
 import type { AuditRecord } from "../store";
 import type { Finding } from "../audit/types";
 import { PRICE_USD } from "../audit/thresholds";
+import { AMOUNT_SYMBOL_RE } from "../audit/currency";
 
 export interface FindingView {
   rule_id: string;
@@ -34,6 +35,8 @@ export interface ReportView {
   stage: string;
   paid: boolean;
   price_usd: number;
+  /** ISO code of the audited account's currency (amounts' denomination) */
+  currency: string;
   created_at: string;
   email_masked: string | null;
   health_score: number | null;
@@ -60,7 +63,10 @@ export interface ReportView {
  *  in full — never the precise waste total, which also hides inside the
  *  executive summary text, not just the total_waste field. */
 function redactMoney(text: string): string {
-  return text.replace(/\$\s?[\d,]+(?:\.\d{1,2})?/g, "$•••");
+  // Redact amounts in ANY currency, keeping the amount's own symbol so
+  // a € report doesn't leak (or mislabel) figures behind a "$•••".
+  const re = new RegExp(`(${AMOUNT_SYMBOL_RE.source})\\s?[\\d,]+(?:\\.\\d{1,2})?`, "g");
+  return text.replace(re, (_m, sym: string) => `${sym}•••`);
 }
 
 function maskEmail(email: string | null): string | null {
@@ -126,6 +132,7 @@ export function buildReportView(audit: AuditRecord): ReportView {
     stage: audit.stage,
     paid: audit.paid,
     price_usd: PRICE_USD,
+    currency: audit.currency ?? "USD",
     created_at: audit.created_at,
     email_masked: maskEmail(audit.email),
     health_score: audit.health_score,
@@ -141,7 +148,11 @@ export function buildReportView(audit: AuditRecord): ReportView {
         ? redactMoney(audit.narrative.executive_summary)
         : audit.narrative.executive_summary
       : null,
-    score_reason: audit.narrative?.score_reason ?? null,
+    score_reason: audit.narrative
+      ? unpaid
+        ? redactMoney(audit.narrative.score_reason)
+        : audit.narrative.score_reason
+      : null,
     whats_working: unpaid ? null : (audit.narrative?.whats_working ?? null),
     data_notes: audit.data_notes ?? [],
     findings,

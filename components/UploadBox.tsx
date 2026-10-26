@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { symbolForCurrency } from "@/lib/audit/currency";
 import { useRouter } from "next/navigation";
 import { ExportGuideSteps } from "./ExportGuide";
 
@@ -10,7 +11,7 @@ type Phase =
   | { kind: "checking" }
   | { kind: "error-inline"; message: string } // format/size problems (DESIGN §4.4)
   | { kind: "error-card"; message: string; columnsFound: string[] | null } // parse problems (§4.5)
-  | { kind: "email"; auditId: string; rows: number; spend: number };
+  | { kind: "email"; auditId: string; rows: number; spend: number; currency: string };
 
 const INDUSTRIES = [
   "E-commerce / retail",
@@ -71,6 +72,7 @@ export function UploadBox() {
           auditId: String(body.audit_id),
           rows: Number(body.row_count),
           spend: Number(body.total_spend),
+          currency: typeof body.currency === "string" ? body.currency : "USD",
         });
         return;
       }
@@ -206,7 +208,7 @@ export function UploadBox() {
         <summary>Optional: help us tune the audit — skip if you&apos;re not sure</summary>
         <div className="body">
           <div className="field">
-            <label htmlFor="opt-cpa">Target CPA ($) — Optional</label>
+            <label htmlFor="opt-cpa">Target CPA (in your account currency) — Optional</label>
             <input id="opt-cpa" type="number" min="0" step="0.01" placeholder="e.g. 25" />
           </div>
           <div className="field">
@@ -242,7 +244,7 @@ export function UploadBox() {
             <h3>Where should we send your audit?</h3>
             <p>
               Your file checks out — <strong>{phase.rows} rows</strong>,{" "}
-              <strong>${phase.spend.toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong> spent in the period.
+              <strong>{symbolForCurrency(phase.currency)}{phase.spend.toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong> spent in the period.
             </p>
             {emailSendErr && <div className="alert error">{emailSendErr}</div>}
             <div className="field">

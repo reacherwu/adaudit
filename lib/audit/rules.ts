@@ -9,6 +9,7 @@
 
 import type { AdRow, Aggregates, AuditResult, Finding, Level, RuleHit, Severity } from "./types";
 import { THRESHOLDS as T, SCORE_CAPS, SCORE_FORMULA } from "./thresholds";
+import { symbolForCurrency } from "./currency";
 import { PREVIEW_TITLES } from "./fixes";
 
 const money = (n: number) =>
@@ -81,6 +82,8 @@ function aggregateGroup(key: string, rows: AdRow[]): GroupAgg {
 export interface EngineOptions {
   targetCpa?: number | null;
   level: Level;
+  /** ISO 4217 code the rows are denominated in (default USD) */
+  currency?: string;
 }
 
 export function runAudit(rows: AdRow[], opts: EngineOptions): AuditResult {
@@ -172,7 +175,7 @@ export function runAudit(rows: AdRow[], opts: EngineOptions): AuditResult {
     const shareHit = S > 0 && g.spend / S >= T.R6_SHARE && avgCpa !== null && g.cpa !== null && g.cpa > avgCpa;
     if (freqHit || shareHit) {
       hit("R6", g.key, "medium",
-        { spend: round2(g.spend), frequency: g.frequency ? round2(g.frequency) : "n/a", spend_share_pct: round2((g.spend / S) * 100) },
+        { spend: round2(g.spend), frequency: g.frequency ? round2(g.frequency) : "n/a", spend_share_pct: S > 0 ? round2((g.spend / S) * 100) : 0 },
         round2(g.spend * T.R6_WASTE_RATIO));
     }
   }
@@ -315,7 +318,7 @@ export function runAudit(rows: AdRow[], opts: EngineOptions): AuditResult {
     findings.push({
       rule_id: ruleId,
       severity,
-      title: buildTitle(ruleId, ruleHits, applies, level),
+      title: buildTitle(ruleId, ruleHits, applies, level, opts.currency ?? "USD"),
       preview_title: PREVIEW_TITLES[ruleId] ?? ruleId,
       evidence_text: buildEvidence(ruleId, ruleHits),
       waste_usd: waste,
@@ -386,6 +389,7 @@ export function runAudit(rows: AdRow[], opts: EngineOptions): AuditResult {
     grade: grade as AuditResult["grade"],
     total_waste: totalWaste,
     issue_count: findings.length,
+    currency: opts.currency ?? "USD",
   };
 }
 
@@ -393,13 +397,13 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-function buildTitle(ruleId: string, ruleHits: RuleHit[], applies: string[], level: Level): string {
+function buildTitle(ruleId: string, ruleHits: RuleHit[], applies: string[], level: Level, currency: string): string {
   const unit = level === "ad" ? "ad" : "ad set";
   const n = applies.length;
   const sumSpend = ruleHits.reduce((s, h) => s + (typeof h.evidence.spend === "number" ? h.evidence.spend : 0), 0);
   switch (ruleId) {
     case "R1":
-      return `${n} ${unit}${n === 1 ? "" : "s"} spent $${money(sumSpend)} with zero conversions`;
+      return `${n} ${unit}${n === 1 ? "" : "s"} spent ${symbolForCurrency(currency)}${money(sumSpend)} with zero conversions`;
     case "R2":
       return `${n} ${unit}${n === 1 ? "" : "s"} paying 2x+ the benchmark cost per result`;
     case "R3": {

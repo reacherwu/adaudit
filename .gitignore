@@ -11,3 +11,4 @@ out/
 
 .secrets.local
 !.env.example
+.codegraph/

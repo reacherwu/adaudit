@@ -10,6 +10,11 @@ import Papa from "papaparse";
 import ExcelJS from "exceljs";
 import type { AdRow, Level } from "./types";
 import { mapHeader, missingRequiredFields, labelForField, type FieldKey } from "./columns";
+import {
+  DEFAULT_CURRENCY,
+  currencyCodeFromCellSymbol,
+  currencyCodeFromText,
+} from "./currency";
 import { LIMITS } from "./thresholds";
 
 export class UploadError extends Error {
@@ -64,15 +69,75 @@ export function validateUpload(buffer: Buffer, filename: string): FileKind {
   );
 }
 
-/** Parse a numeric cell: strips $, £, €, commas, % and spaces. Empty/junk -> null. */
+/**
+ * Parse a numeric cell, locale-aware.
+ *
+ * Ads Manager exports follow the account's locale, so the same value can
+ * arrive as "1,234.56" (US), "1.234,56" (DE), "1 234,56" (FR) or plain
+ * "1234.56". Rules:
+ *  - both '.' and ',' present → the RIGHTMOST one is the decimal
+ *    separator, the other is thousands and is dropped;
+ *  - only ',' → multiple commas are thousands separators; a single comma
+ *    followed by 1–2 digits is a decimal comma; a single comma followed
+ *    by exactly 3 digits is a thousands separator (US style "1,234");
+ *  - only '.' → multiple dots are thousands separators (DE "1.234.567");
+ *    a single dot is a decimal point;
+ *  - spaces (incl. NBSP / narrow NBSP) and apostrophes are thousands
+ *    separators (FR "1 234,56", CH "1'234.56");
+ *  - currency symbols / '%' are stripped (currency is detected separately,
+ *    see detectCurrency); a leading '-' or wrapping parentheses negate.
+ * Empty/junk -> null.
+ */
 export function parseNumber(raw: unknown): number | null {
   if (raw === null || raw === undefined) return null;
   if (typeof raw === "number") return Number.isFinite(raw) ? raw : null;
-  const s = String(raw).trim();
+  let s = String(raw).trim();
   if (!s || s === "-" || s === "—" || s.toLowerCase() === "n/a") return null;
-  const cleaned = s.replace(/[$£€,\s%]/g, "");
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
+  let negative = false;
+  if (/^\(.*\)$/.test(s)) {
+    negative = true;
+    s = s.slice(1, -1).trim();
+  }
+  // Strip currency symbols/codes, %, and grouping spaces/apostrophes.
+  s = s
+    .replace(/[A-Z]{3}(?=\s*\d)/gi, "") // leading ISO code, e.g. "EUR 1.234,56"
+    .replace(/[^\d.,\s'’-]/g, " ")
+    .replace(/[\s'’]/g, "");
+  if (s.startsWith("-")) {
+    negative = true;
+    s = s.slice(1);
+  }
+  s = s.replace(/-/g, "");
+  if (!s || !/\d/.test(s)) return null;
+
+  const lastDot = s.lastIndexOf(".");
+  const lastComma = s.lastIndexOf(",");
+  let normalized: string;
+  if (lastDot >= 0 && lastComma >= 0) {
+    // Both present: rightmost is the decimal separator.
+    if (lastComma > lastDot) {
+      normalized = s.replace(/\./g, "").replace(",", ".");
+    } else {
+      normalized = s.replace(/,/g, "");
+    }
+  } else if (lastComma >= 0) {
+    const parts = s.split(",");
+    if (parts.length > 2) {
+      normalized = parts.join(""); // thousands separators
+    } else if (parts[1].length === 3) {
+      normalized = parts.join(""); // "1,234" — US thousands
+    } else {
+      normalized = `${parts[0]}.${parts[1]}`; // decimal comma
+    }
+  } else if (lastDot >= 0) {
+    const parts = s.split(".");
+    normalized = parts.length > 2 ? parts.join("") : s; // DE thousands vs decimal point
+  } else {
+    normalized = s;
+  }
+  const n = Number(normalized);
+  if (!Number.isFinite(n)) return null;
+  return negative ? -n : n;
 }
 
 function cellText(raw: unknown): string {
@@ -92,8 +157,76 @@ function cellText(raw: unknown): string {
 export interface ParseSuccess {
   rows: AdRow[];
   columnsFound: string[];
-  /** rows whose negative spend was clamped to $0 (refunds/adjustments) */
+  /** rows whose negative spend was clamped to 0 (refunds/adjustments) */
   clampedSpendRows: number;
+  /** ISO 4217 code the export is denominated in (see detectCurrency) */
+  currency: string;
+  /** every distinct currency detected in the file, in detection order.
+   *  More than one means a mixed-currency export — amounts are audited
+   *  as `currency` (the first/majority one) and the mix is disclosed. */
+  currenciesSeen: string[];
+}
+
+/**
+ * Detect the export's currency, in priority order:
+ *  1. the money columns' own headers ("Amount spent (EUR)");
+ *  2. a dedicated Currency / Account Currency column's cell values;
+ *  3. symbols inside the money cells themselves (€, £, $, …);
+ *  4. USD (Ads Manager's most common account currency — and the only
+ *     honest fallback: the report never claims another currency without
+ *     evidence in the file).
+ */
+function detectCurrency(
+  headerRaw: string[],
+  fieldByCol: Map<number, FieldKey>,
+  dataRows: unknown[][],
+): { currency: string; currenciesSeen: string[] } {
+  const seen: string[] = [];
+  const note = (c: string | null) => {
+    if (c && !seen.includes(c)) seen.push(c);
+    return c;
+  };
+
+  // 1. Money-column headers carry the code in Ads Manager exports.
+  for (const [i, f] of fieldByCol) {
+    if (f === "amount_spent" || f === "cost_per_result" || f === "daily_budget" || f === "lifetime_budget") {
+      const c = note(currencyCodeFromText(headerRaw[i] ?? ""));
+      if (c) return { currency: c, currenciesSeen: seen };
+    }
+  }
+  // 2. A dedicated currency column.
+  const curCol = headerRaw.findIndex((h) => /currency/i.test(h ?? ""));
+  if (curCol >= 0) {
+    const counts = new Map<string, number>();
+    for (const r of dataRows) {
+      const c = currencyCodeFromText(cellText(r[curCol]));
+      if (c) {
+        note(c);
+        counts.set(c, (counts.get(c) ?? 0) + 1);
+      }
+    }
+    if (counts.size > 0) {
+      const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+      return { currency: top, currenciesSeen: seen };
+    }
+  }
+  // 3. Symbols inside money cells (first consistent symbol wins; all
+  //    distinct symbols are collected for the mixed-currency disclosure).
+  const moneyCols = [...fieldByCol.entries()]
+    .filter(([, f]) => f === "amount_spent" || f === "cost_per_result")
+    .map(([i]) => i);
+  let first: string | null = null;
+  for (const r of dataRows) {
+    for (const i of moneyCols) {
+      const c = currencyCodeFromCellSymbol(r[i]);
+      if (c) {
+        note(c);
+        if (!first) first = c;
+      }
+    }
+  }
+  if (first) return { currency: first, currenciesSeen: seen };
+  return { currency: DEFAULT_CURRENCY, currenciesSeen: seen };
 }
 
 function buildRows(
@@ -139,7 +272,7 @@ function buildRows(
     if (spend === null) continue; // summary/blank rows in exports carry no spend
     // Negative spend rows are refund/adjustment artifacts of the export.
     // Counting them would subtract phantom money from every total and
-    // could push an account's spend negative — clamp to $0 and disclose
+    // could push an account's spend negative — clamp to 0 and disclose
     // the count on the report (see ParseSuccess.clampedSpendRows).
     if (spend < 0) clampedSpendRows += 1;
     let frequency = parseNumber(get("frequency"));
@@ -173,7 +306,8 @@ function buildRows(
     );
   }
 
-  return { rows, columnsFound: headerRaw.filter(Boolean), clampedSpendRows };
+  const { currency, currenciesSeen } = detectCurrency(headerRaw, fieldByCol, dataRows);
+  return { rows, columnsFound: headerRaw.filter(Boolean), clampedSpendRows, currency, currenciesSeen };
 }
 
 /** Data-quality gate (PRD F3): refuse files that can't support an audit. */
@@ -188,7 +322,7 @@ export function qualityGate(rows: AdRow[]): void {
   if (totalSpend <= 0) {
     throw new UploadError(
       "zero_spend",
-      "This export shows $0 spend. That usually means the date range was empty or the wrong ad account was selected. Check the range covers days with active ads, then re-export.",
+      "This export shows zero spend. That usually means the date range was empty or the wrong ad account was selected. Check the range covers days with active ads, then re-export.",
     );
   }
 }

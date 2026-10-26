@@ -75,6 +75,12 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
+            <p style={{ marginTop: 18 }}>
+              <Link href="/rules">The 12 checks, explained — thresholds, triggers and how the waste estimate is computed →</Link>
+            </p>
+            <p style={{ marginTop: 8 }}>
+              <Link href="/compare">How AdAudit compares to other Meta ads audit tools →</Link>
+            </p>
           </div>
         </section>
 

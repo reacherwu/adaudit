@@ -80,6 +80,10 @@ export interface AuditResult {
   grade: "Healthy" | "Needs work" | "Wasteful" | "Critical";
   total_waste: number;
   issue_count: number;
+  /** ISO 4217 code every amount in this result is denominated in.
+   *  (Finding.waste_usd keeps its legacy name — it holds an amount in
+   *  THIS currency; the name is frozen by stored data compatibility.) */
+  currency: string;
 }
 
 export interface FixItem {

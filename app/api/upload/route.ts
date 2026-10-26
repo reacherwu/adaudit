@@ -76,9 +76,14 @@ export async function POST(req: NextRequest) {
     const parsed = await parseExport(buffer, kind, level);
 
     const dataNotes: string[] = [];
+    if (parsed.currenciesSeen.length > 1) {
+      dataNotes.push(
+        `Your export appears to mix currencies (${parsed.currenciesSeen.join(", ")}). We audited the amounts as ${parsed.currency} — if part of the file is denominated differently, re-export a single account so the totals are exact.`,
+      );
+    }
     if (parsed.clampedSpendRows > 0) {
       dataNotes.push(
-        `${parsed.clampedSpendRows} row${parsed.clampedSpendRows === 1 ? "" : "s"} in your export had negative spend (usually refund or adjustment rows). We counted ${parsed.clampedSpendRows === 1 ? "it" : "them"} as $0 so refunds don't distort your totals.`,
+        `${parsed.clampedSpendRows} row${parsed.clampedSpendRows === 1 ? "" : "s"} in your export had negative spend (usually refund or adjustment rows). We counted ${parsed.clampedSpendRows === 1 ? "it" : "them"} as 0 so refunds don't distort your totals.`,
       );
     }
 
@@ -88,6 +93,7 @@ export async function POST(req: NextRequest) {
       target_cpa: targetCpa,
       industry,
       columns_found: parsed.columnsFound,
+      currency: parsed.currency,
       data_notes: dataNotes,
       stage: "File checked",
     });
@@ -97,6 +103,7 @@ export async function POST(req: NextRequest) {
       audit_id: audit.id,
       row_count: parsed.rows.length,
       total_spend: Math.round(totalSpend * 100) / 100,
+      currency: parsed.currency,
       columns_found: parsed.columnsFound,
     });
   } catch (err) {

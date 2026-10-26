@@ -99,6 +99,7 @@ export async function createAudit(input: Partial<AuditRecord>): Promise<AuditRec
     status: "awaiting_email",
     stage: "File checked",
     level: "adset",
+    currency: "USD",
     target_cpa: null,
     industry: null,
     columns_found: [],

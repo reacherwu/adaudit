@@ -21,7 +21,7 @@ export async function runAuditPipeline(
   if (!audit) return;
   try {
     await updateAudit(auditId, { status: "processing", stage: "Running 12 checks against your data" });
-    const result = runAudit(rows, { level: audit.level, targetCpa: audit.target_cpa });
+    const result = runAudit(rows, { level: audit.level, targetCpa: audit.target_cpa, currency: audit.currency ?? "USD" });
 
     await updateAudit(auditId, { stage: "Writing your report" });
     const narrative = await generateNarrative(auditId, result, audit.industry);

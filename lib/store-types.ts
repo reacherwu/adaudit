@@ -18,6 +18,9 @@ export interface AuditRecord {
   status: AuditStatus;
   stage: string; // current processing stage label for the progress page
   level: "adset" | "ad";
+  /** ISO 4217 code of the audited account. Absent on records created
+   *  before currency detection existed — readers must use ?? "USD". */
+  currency?: string;
   target_cpa: number | null;
   industry: string | null;
   columns_found: string[];

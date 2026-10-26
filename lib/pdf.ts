@@ -7,6 +7,7 @@
 
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { AuditRecord } from "./store";
+import { symbolForCurrency } from "./audit/currency";
 
 const INK = rgb(0.078, 0.125, 0.18);
 const MUTED = rgb(0.35, 0.42, 0.486);
@@ -43,6 +44,13 @@ const money = (n: number) =>
   n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export async function buildReportPdf(audit: AuditRecord): Promise<Uint8Array> {
+  // pdf-lib's standard fonts are WinAnsi-encoded: glyphs like ₹/₩/₽
+  // would throw at draw time. Use the symbol only when WinAnsi can
+  // encode it, else fall back to the ISO code ("INR 1,234.56").
+  const rawSym = symbolForCurrency(audit.currency ?? "USD");
+  const sym = /^[\x20-\x7E]*$/.test(rawSym) || ["€", "£", "¥"].includes(rawSym)
+    ? rawSym
+    : `${(audit.currency ?? "USD").toUpperCase()} `;
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
@@ -93,7 +101,7 @@ export async function buildReportPdf(audit: AuditRecord): Promise<Uint8Array> {
   text(`Generated ${date} · Data: last 30 days (as exported)`, 10, font, MUTED, 10);
 
   heading(`Health Score: ${audit.health_score}/100 — ${audit.grade}`);
-  text(`Estimated waste in the period: $${money(audit.total_waste ?? 0)} (estimated)`, 12, bold, RED, 8);
+  text(`Estimated waste in the period: ${sym}${money(audit.total_waste ?? 0)} (estimated)`, 12, bold, RED, 8);
   if (n.score_reason) text(n.score_reason, 11);
 
   heading("Executive summary");
@@ -108,7 +116,7 @@ export async function buildReportPdf(audit: AuditRecord): Promise<Uint8Array> {
     if (why) text(`Why it matters: ${why}`, 10.5, font, INK, 4);
     text(
       f.waste_usd !== null
-        ? `Estimated waste: $${money(f.waste_usd)} (estimated)${f.waste_note ? ` — ${f.waste_note}` : ""}`
+        ? `Estimated waste: ${sym}${money(f.waste_usd)} (estimated)${f.waste_note ? ` — ${f.waste_note}` : ""}`
         : (f.note ?? "No waste amount estimated for this item."),
       10.5, font, INK, 10,
     );

@@ -37,7 +37,7 @@ const ALIASES: Record<string, FieldKey> = {
 export const REQUIRED_COLUMN_LABELS: { field: FieldKey; label: string; why: string }[] = [
   { field: "campaign_name", label: "Campaign name", why: "Account structure analysis" },
   { field: "adset_name", label: "Ad set name", why: "Most checks run per ad set" },
-  { field: "amount_spent", label: "Amount spent (USD)", why: "Every waste calculation" },
+  { field: "amount_spent", label: "Amount spent", why: "Every waste calculation" },
   { field: "impressions", label: "Impressions", why: "Frequency and CPM checks" },
   { field: "reach", label: "Reach", why: "Frequency cross-check" },
   { field: "frequency", label: "Frequency", why: "Audience fatigue checks" },
@@ -51,7 +51,7 @@ export const REQUIRED_COLUMN_LABELS: { field: FieldKey; label: string; why: stri
 export function normalizeHeader(raw: string): string {
   return raw
     .toLowerCase()
-    .replace(/\((usd|eur|gbp|aud|cad|account currency)\)/g, "")
+    .replace(/\(([a-z]{3}|account currency)\)/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }

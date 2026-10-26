@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReportView } from "@/lib/report/view";
+import { symbolForCurrency } from "@/lib/audit/currency";
 
 const money = (n: number) =>
   n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -216,7 +217,7 @@ export function ReportClient({ token, initial }: { token: string; initial: Repor
               {view.total_waste !== null ? (
                 <>
                   Estimated waste last 30 days:{" "}
-                  <strong className="waste-amount num">${money(view.total_waste)} (estimated)</strong>
+                  <strong className="waste-amount num">{symbolForCurrency(view.currency)}{money(view.total_waste)} (estimated)</strong>
                 </>
               ) : (
                 <>
@@ -260,7 +261,7 @@ export function ReportClient({ token, initial }: { token: string; initial: Repor
                   <p className="evidence">Evidence: {f.evidence_text}</p>
                   {f.why_it_matters && <p>Why it matters: {f.why_it_matters}</p>}
                   {f.waste_usd !== null ? (
-                    <p>Estimated waste: <strong className="waste-amount num">${money(f.waste_usd)} (estimated)</strong>
+                    <p>Estimated waste: <strong className="waste-amount num">{symbolForCurrency(view.currency)}{money(f.waste_usd)} (estimated)</strong>
                       {f.waste_note ? <span className="muted"> — {f.waste_note}</span> : null}
                     </p>
                   ) : (
@@ -282,7 +283,7 @@ export function ReportClient({ token, initial }: { token: string; initial: Repor
           <div className="card highlight" style={{ margin: "22px 0" }}>
             <h3>Unlock the full report</h3>
             <ul>
-              <li>All {view.issue_count} waste items — with evidence &amp; $ amounts</li>
+              <li>All {view.issue_count} waste items — with evidence &amp; amounts</li>
               <li>The full fix checklist, ordered by priority</li>
               <li>PDF download for your records</li>
               <li>1 free re-check within 30 days</li>
